@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { createMcpServer } from "./server.mjs";
+import { createMcpServer } from "../src/server.mjs";
 
 async function main() {
   if (!process.env.TELEGRAM_BOT_TOKEN) {
