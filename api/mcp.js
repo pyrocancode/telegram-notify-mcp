@@ -62,7 +62,7 @@ module.exports = async (req, res) => {
     const { WebStandardStreamableHTTPServerTransport } = await import(
       "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js"
     );
-    const { createMcpServer } = await import("../src/server.mjs");
+    const { createMcpServer } = await import("./lib/server.mjs");
 
     async function handleMcp(request) {
       const auth = checkAuth(request);
