@@ -95,3 +95,5 @@ module.exports = async (req, res) => {
     sendJson(res, 500, { error: String(error) });
   }
 };
+
+module.exports.config = { maxDuration: 60 };

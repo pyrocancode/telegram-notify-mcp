@@ -1,9 +1,0 @@
-{
-  "buildCommand": "",
-  "functions": {
-    "api/mcp.js": {
-      "maxDuration": 60,
-      "includeFiles": "src/server.mjs"
-    }
-  }
-}
