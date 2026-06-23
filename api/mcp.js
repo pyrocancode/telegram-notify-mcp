@@ -74,6 +74,7 @@ module.exports = async (req, res) => {
       const server = createMcpServer();
       const transport = new WebStandardStreamableHTTPServerTransport({
         sessionIdGenerator: undefined,
+        enableJsonResponse: true,
       });
 
       try {
