@@ -215,7 +215,6 @@ export function createMcpServer() {
     }
   );
 
-  // ponytail: file_path needs local disk — skip on Vercel (VERCEL=1)
   if (!process.env.VERCEL) {
     server.tool(
       "send_photo",

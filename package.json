@@ -2,13 +2,12 @@
   "name": "telegram-notify-mcp",
   "version": "1.2.0",
   "description": "MCP server for Telegram notifications (Cursor + Claude Desktop)",
-  "type": "module",
   "bin": {
-    "telegram-notify-mcp": "./src/index.js"
+    "telegram-notify-mcp": "./src/index.mjs"
   },
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "node src/index.js",
+    "start": "node src/index.mjs",
+    "dev": "node src/index.mjs",
     "vercel:dev": "vercel dev"
   },
   "dependencies": {

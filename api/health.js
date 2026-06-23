@@ -1,3 +1,3 @@
-import { createRequire } from "node:module";
-
-export default createRequire(import.meta.url)("./health.cjs");
+module.exports = (_req, res) => {
+  res.status(200).json({ ok: true });
+};
