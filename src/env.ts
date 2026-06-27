@@ -13,6 +13,8 @@ export type Env = {
   cursorAgentId?: string;
   cursorRepoUrl?: string;
   cursorRepoRef?: string;
+  /** Whisper transcription for inbound voice messages */
+  openaiApiKey?: string;
 };
 
 function required(name: string): string {
@@ -65,6 +67,9 @@ export function loadEnv(): Env {
     env.cursorRepoUrl = repoUrl;
     env.cursorRepoRef = process.env.CURSOR_REPO_REF?.trim() || "main";
   }
+
+  const openaiApiKey = process.env.OPENAI_API_KEY?.trim();
+  if (openaiApiKey) env.openaiApiKey = openaiApiKey;
 
   return env;
 }

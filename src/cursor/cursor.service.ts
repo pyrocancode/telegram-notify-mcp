@@ -1,11 +1,12 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { CursorAgentError } from "@cursor/sdk";
+import { CursorAgentError, type SDKUserMessage } from "@cursor/sdk";
 import { loadEnv, mcpUrl } from "../env";
 import { resolveSharedAgent } from "./resolve-shared-agent";
+import type { InboundImage } from "../telegram/telegram-inbound";
 import { TelegramCascadeStreamer } from "../telegram/telegram-cascade";
 import { TelegramService } from "../telegram/telegram.service";
 
-type RunInput = { chatId: string; text: string };
+type RunInput = { chatId: string; text: string; images?: InboundImage[] };
 
 @Injectable()
 export class CursorService {
@@ -14,7 +15,7 @@ export class CursorService {
 
   constructor(private readonly telegram: TelegramService) {}
 
-  async runFromTelegram({ chatId, text }: RunInput): Promise<void> {
+  async runFromTelegram({ chatId, text, images }: RunInput): Promise<void> {
     if (!this.env.bridgeEnabled || !this.env.cursorApiKey) {
       throw new Error("Cursor bridge is not configured");
     }
@@ -29,12 +30,33 @@ export class CursorService {
       "Выполни запрос пользователя из Telegram.",
       "",
       `Запрос: ${text}`,
+      images?.length
+        ? `(К запросу приложено ${images.length} изображение(й) — смотри вложения.)`
+        : "",
       "",
       "Текст ответа стримится в Telegram автоматически (по предложениям).",
-      "Не дублируй финальный ответ через send_notification.",
-      "MCP telegram используй только для send_chat_action (typing) при долгой работе.",
+      "Не дублируй финальный текст через send_notification.",
+      "Картинки и файлы отправляй через MCP send_photo или send_document:",
+      "- прочитай файл (read), закодируй base64, передай photo_base64 / document_base64 + filename",
+      "- или публичный HTTPS URL в photo_url / document_url",
+      "Никогда не вставляй HTML <img>, markdown-картинки и локальные пути (/opt/..., /tmp/...) — они не доходят до чата.",
+      "MCP telegram: send_chat_action (typing/upload_photo) при долгой работе.",
       "Пиши кратко, по-русски.",
-    ].join("\n");
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const userMessage: SDKUserMessage = {
+      text: prompt,
+      ...(images?.length
+        ? {
+            images: images.map((img) => ({
+              data: img.data,
+              mimeType: img.mimeType,
+            })),
+          }
+        : {}),
+    };
 
     const mcpHeaders: Record<string, string> = {
       "X-Telegram-Bot-Token": this.env.telegramBotToken,
@@ -77,7 +99,7 @@ export class CursorService {
     this.log.log(`agent ${agent.agentId} (${this.env.cursorWorkspaceName})`);
 
     try {
-      const run = await agent.send(prompt, {
+      const run = await agent.send(userMessage, {
         mcpServers,
         onDelta: ({ update }) => {
           if (update.type === "text-delta" && update.text) {

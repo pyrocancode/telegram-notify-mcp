@@ -1,6 +1,6 @@
 {
   "name": "telegram-mcp",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Telegram MCP server + Cursor bridge (NestJS on Vercel)",
   "private": true,
   "scripts": {
@@ -8,7 +8,7 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
-    "self-check": "node dist/env.js && node dist/telegram/telegram-cascade.js && node dist/cursor/resolve-shared-agent.js"
+    "self-check": "node dist/env.js && node dist/telegram/telegram-cascade.js && node dist/cursor/resolve-shared-agent.js && node dist/telegram/telegram-files.js"
   },
   "dependencies": {
     "@cursor/sdk": "^1.0.21",

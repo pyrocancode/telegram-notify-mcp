@@ -5,6 +5,10 @@ import {
   telegramCall,
   type TelegramConfig,
 } from "../telegram/telegram-api";
+import {
+  sendDocumentFromSource,
+  sendPhotoFromSource,
+} from "../telegram/telegram-files";
 
 const parseModeSchema = z
   .enum(["HTML", "MarkdownV2", "Markdown"])
@@ -65,7 +69,7 @@ export function createMcpServer(telegram: TelegramConfig): McpServer {
 
   const server = new McpServer({
     name: "telegram-notify",
-    version: "1.4.0",
+    version: "1.5.0",
   });
 
   // ponytail: MCP+zod TS2589 — schemas match upstream telegram-notify-mcp at runtime
@@ -178,6 +182,105 @@ export function createMcpServer(telegram: TelegramConfig): McpServer {
       return {
         content: [
           { type: "text" as const, text: `Rich draft ${draft_id} updated` },
+        ],
+      };
+    },
+  );
+
+  // ponytail: MCP+zod TS2589 — schemas match upstream telegram-notify-mcp at runtime
+  server.tool(
+    "send_photo",
+    "Send a photo to Telegram (sendPhoto). Use photo_url (HTTPS) or photo_base64 — never HTML <img> or local paths.",
+    {
+      photo_url: z.string().url().optional().describe("Public HTTPS image URL"),
+      photo_base64: z
+        .string()
+        .max(10_000_000)
+        .optional()
+        .describe("Base64-encoded image bytes (JPEG/PNG)"),
+      caption: z.string().max(1024).optional().describe("Photo caption"),
+      chat_id: chatIdSchema,
+      silent: silentSchema,
+      parse_mode: parseModeSchema,
+    },
+    async ({
+      photo_url,
+      photo_base64,
+      caption,
+      chat_id,
+      silent,
+      parse_mode,
+    }) => {
+      if (!photo_url && !photo_base64) {
+        throw new Error("photo_url or photo_base64 is required");
+      }
+      const chat = resolveChatId(telegram, chat_id);
+      const result = await sendPhotoFromSource(
+        botToken,
+        chat,
+        { url: photo_url, base64: photo_base64 },
+        { caption, parse_mode, silent },
+      );
+      return {
+        content: [
+          { type: "text" as const, text: `Photo sent. message_id=${result.message_id}` },
+        ],
+      };
+    },
+  );
+
+  server.tool(
+    "send_document",
+    "Send a file to Telegram (sendDocument). Use document_url (HTTPS) or document_base64.",
+    {
+      document_url: z.string().url().optional().describe("Public HTTPS file URL"),
+      document_base64: z
+        .string()
+        .max(10_000_000)
+        .optional()
+        .describe("Base64-encoded file bytes"),
+      filename: z
+        .string()
+        .max(256)
+        .optional()
+        .describe("Filename (required with document_base64)"),
+      caption: z.string().max(1024).optional().describe("File caption"),
+      chat_id: chatIdSchema,
+      silent: silentSchema,
+      parse_mode: parseModeSchema,
+    },
+    async ({
+      document_url,
+      document_base64,
+      filename,
+      caption,
+      chat_id,
+      silent,
+      parse_mode,
+    }) => {
+      if (!document_url && !document_base64) {
+        throw new Error("document_url or document_base64 is required");
+      }
+      if (document_base64 && !filename) {
+        throw new Error("filename is required with document_base64");
+      }
+      const chat = resolveChatId(telegram, chat_id);
+      const result = await sendDocumentFromSource(
+        botToken,
+        chat,
+        {
+          url: document_url,
+          base64: document_base64,
+          filename: filename ?? "file.bin",
+        },
+        { caption, parse_mode, silent },
+      );
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Document sent. message_id=${result.message_id}`,
+          },
         ],
       };
     },

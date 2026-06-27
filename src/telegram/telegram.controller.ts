@@ -10,6 +10,8 @@ import {
 } from "@nestjs/common";
 import { waitUntil } from "@vercel/functions";
 import { CursorService } from "../cursor/cursor.service";
+import { loadEnv } from "../env";
+import { parseInboundMessage } from "./telegram-inbound";
 import { TelegramService } from "./telegram.service";
 import type { TelegramUpdate } from "./telegram.types";
 
@@ -37,10 +39,9 @@ export class TelegramController {
     }
 
     const message = update.message;
-    const text = message?.text?.trim();
     const chatId = message?.chat.id;
 
-    if (!message || chatId == null || !text) {
+    if (!message || chatId == null) {
       return { ok: true };
     }
 
@@ -49,19 +50,49 @@ export class TelegramController {
       return { ok: true };
     }
 
-    if (text === "/start" || /^прив(ет)?$/i.test(text)) {
+    const textOnly = message.text?.trim();
+    if (textOnly === "/start" || (textOnly && /^прив(ет)?$/i.test(textOnly))) {
       await this.telegram.sendText(
         chatId,
-        "Привет. Напиши задачу — запущу cloud-агента Cursor. Ответ придёт сюда же.",
+        "Привет. Напиши задачу, пришли фото/файл или голосовое — запущу cloud-агента Cursor.",
       );
       return { ok: true };
     }
+
+    const env = loadEnv();
+    let inbound;
+    try {
+      inbound = await parseInboundMessage(
+        env.telegramBotToken,
+        message,
+        env.openaiApiKey,
+      );
+    } catch (err) {
+      this.log.error("inbound media failed", err);
+      await this.telegram.sendText(
+        chatId,
+        "Не удалось обработать вложение. Попробуй меньший файл или напиши текстом.",
+      );
+      return { ok: true };
+    }
+
+    if (!inbound.ok) {
+      if (inbound.reason === "voice_no_whisper") {
+        await this.telegram.sendText(
+          chatId,
+          "Голосовые пока не настроены. Добавь OPENAI_API_KEY на Vercel или напиши текстом.",
+        );
+      }
+      return { ok: true };
+    }
+
+    const { text, images } = inbound.payload;
 
     await this.telegram.sendText(chatId, "Принял, запускаю агента…");
 
     waitUntil(
       this.cursor
-        .runFromTelegram({ chatId: String(chatId), text })
+        .runFromTelegram({ chatId: String(chatId), text, images })
         .catch((err) => {
           this.log.error("cursor run failed", err);
           return this.telegram.sendText(
