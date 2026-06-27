@@ -9,6 +9,8 @@ export type Env = {
   allowedChatIds: Set<string>;
   cursorApiKey?: string;
   cursorModel: string;
+  cursorWorkspaceName: string;
+  cursorAgentId?: string;
   cursorRepoUrl?: string;
   cursorRepoRef?: string;
 };
@@ -45,6 +47,8 @@ export function loadEnv(): Env {
         : "http://localhost:3000"),
     bridgeEnabled,
     cursorModel: process.env.CURSOR_MODEL?.trim() || "composer-2.5",
+    cursorWorkspaceName:
+      process.env.CURSOR_WORKSPACE_NAME?.trim() || "grill",
     allowedChatIds: new Set<string>(),
   };
 
@@ -52,6 +56,8 @@ export function loadEnv(): Env {
     env.telegramWebhookSecret = webhookSecret;
     env.allowedChatIds = parseAllowedChatIds(allowedRaw!);
     env.cursorApiKey = cursorApiKey;
+    const agentId = process.env.CURSOR_AGENT_ID?.trim();
+    if (agentId) env.cursorAgentId = agentId;
   }
 
   const repoUrl = process.env.CURSOR_REPO_URL?.trim();

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { Agent, CursorAgentError } from "@cursor/sdk";
+import { CursorAgentError } from "@cursor/sdk";
 import { loadEnv, mcpUrl } from "../env";
+import { resolveSharedAgent } from "./resolve-shared-agent";
 import { TelegramCascadeStreamer } from "../telegram/telegram-cascade";
 import { TelegramService } from "../telegram/telegram.service";
 
@@ -24,7 +25,8 @@ export class CursorService {
     );
 
     const prompt = [
-      "Тебя запустили из Telegram. Выполни запрос пользователя.",
+      `Продолжение диалога в workspace «${this.env.cursorWorkspaceName}».`,
+      "Выполни запрос пользователя из Telegram.",
       "",
       `Запрос: ${text}`,
       "",
@@ -61,12 +63,18 @@ export class CursorService {
         }
       : {};
 
-    const agent = await Agent.create({
-      apiKey: this.env.cursorApiKey,
-      model: { id: this.env.cursorModel },
-      cloud,
-      mcpServers,
-    });
+    const agent = await resolveSharedAgent(
+      {
+        apiKey: this.env.cursorApiKey,
+        workspaceName: this.env.cursorWorkspaceName,
+        agentId: this.env.cursorAgentId,
+        model: this.env.cursorModel,
+        cloud,
+        mcpServers,
+      },
+      (msg) => this.log.warn(msg),
+    );
+    this.log.log(`agent ${agent.agentId} (${this.env.cursorWorkspaceName})`);
 
     try {
       const run = await agent.send(prompt, {
