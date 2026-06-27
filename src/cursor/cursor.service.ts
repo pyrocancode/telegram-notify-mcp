@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Agent, CursorAgentError } from "@cursor/sdk";
 import { loadEnv, mcpUrl } from "../env";
+import { TelegramCascadeStreamer } from "../telegram/telegram-cascade";
 import { TelegramService } from "../telegram/telegram.service";
 
 type RunInput = { chatId: string; text: string };
@@ -17,14 +18,20 @@ export class CursorService {
       throw new Error("Cursor bridge is not configured");
     }
 
+    const streamer = new TelegramCascadeStreamer(
+      this.env.telegramBotToken,
+      chatId,
+    );
+
     const prompt = [
       "Тебя запустили из Telegram. Выполни запрос пользователя.",
       "",
       `Запрос: ${text}`,
       "",
-      "Когда закончишь, ответь через MCP `telegram` → `send_notification`.",
-      `Передай chat_id: "${chatId}" если инструмент это поддерживает.`,
-      "Пиши кратко, по-русски. HTML parse_mode при необходимости.",
+      "Текст ответа стримится в Telegram автоматически (по предложениям).",
+      "Не дублируй финальный ответ через send_notification.",
+      "MCP telegram используй только для send_chat_action (typing) при долгой работе.",
+      "Пиши кратко, по-русски.",
     ].join("\n");
 
     const mcpHeaders: Record<string, string> = {
@@ -62,10 +69,23 @@ export class CursorService {
     });
 
     try {
-      const run = await agent.send(prompt, { mcpServers });
+      const run = await agent.send(prompt, {
+        mcpServers,
+        onDelta: ({ update }) => {
+          if (update.type === "text-delta" && update.text) {
+            return streamer.append(update.text).catch((err) => {
+              this.log.warn(
+                `stream append failed: ${err instanceof Error ? err.message : err}`,
+              );
+            });
+          }
+        },
+      });
       this.log.log(`run started: ${run.id} agent=${agent.agentId}`);
 
       const result = await run.wait();
+      await streamer.finish();
+
       if (result.status === "error") {
         this.log.error(`run error: ${result.id}`);
         await this.telegram.sendText(
@@ -75,9 +95,8 @@ export class CursorService {
         return;
       }
 
-      // ponytail: fallback if agent forgot send_notification via MCP
       const reply = result.result?.trim();
-      if (reply) {
+      if (reply && !streamer.hasSent()) {
         await this.telegram.sendText(chatId, reply.slice(0, 4096));
       }
     } catch (err) {
