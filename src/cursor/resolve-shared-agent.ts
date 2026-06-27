@@ -54,13 +54,8 @@ export async function resolveSharedAgent(
     ...base,
     name: opts.workspaceName,
     model: { id: opts.model },
-    cloud: {
-      ...opts.cloud,
-      env: opts.cloud?.env ?? {
-        type: "cloud",
-        name: opts.workspaceName,
-      },
-    },
+    // ponytail: name = agent title in Cursor UI; cloud.env.name is a separate pre-provisioned env
+    cloud: opts.cloud,
   });
 }
 
