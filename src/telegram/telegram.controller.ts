@@ -49,7 +49,7 @@ export class TelegramController {
       return { ok: true };
     }
 
-    if (text === "/start") {
+    if (text === "/start" || /^прив(ет)?$/i.test(text)) {
       await this.telegram.sendText(
         chatId,
         "Привет. Напиши задачу — запущу cloud-агента Cursor. Ответ придёт сюда же.",

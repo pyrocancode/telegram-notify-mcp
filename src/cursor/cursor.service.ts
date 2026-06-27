@@ -72,6 +72,13 @@ export class CursorService {
           chatId,
           "Агент завершился с ошибкой. Смотри run в Cursor dashboard.",
         );
+        return;
+      }
+
+      // ponytail: fallback if agent forgot send_notification via MCP
+      const reply = result.result?.trim();
+      if (reply) {
+        await this.telegram.sendText(chatId, reply.slice(0, 4096));
       }
     } catch (err) {
       if (err instanceof CursorAgentError) {
