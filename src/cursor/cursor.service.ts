@@ -54,14 +54,14 @@ export class CursorService {
         }
       : {};
 
-    try {
-      await using agent = await Agent.create({
-        apiKey: this.env.cursorApiKey,
-        model: { id: this.env.cursorModel },
-        cloud,
-        mcpServers,
-      });
+    const agent = await Agent.create({
+      apiKey: this.env.cursorApiKey,
+      model: { id: this.env.cursorModel },
+      cloud,
+      mcpServers,
+    });
 
+    try {
       const run = await agent.send(prompt, { mcpServers });
       this.log.log(`run started: ${run.id} agent=${agent.agentId}`);
 
@@ -78,6 +78,8 @@ export class CursorService {
         this.log.error(`startup failed: ${err.message}`);
       }
       throw err;
+    } finally {
+      agent.close();
     }
   }
 }
