@@ -13,6 +13,8 @@ export type Env = {
   cursorAgentId?: string;
   cursorRepoUrl?: string;
   cursorRepoRef?: string;
+  obsidianRepoUrl?: string;
+  obsidianRepoRef?: string;
   /** Whisper only */
   openaiApiKey?: string;
   secretaryEnabled: boolean;
@@ -71,6 +73,12 @@ export function loadEnv(): Env {
   if (repoUrl) {
     env.cursorRepoUrl = repoUrl;
     env.cursorRepoRef = process.env.CURSOR_REPO_REF?.trim() || "main";
+  }
+
+  const obsidianUrl = process.env.CURSOR_OBSIDIAN_REPO_URL?.trim();
+  if (obsidianUrl) {
+    env.obsidianRepoUrl = obsidianUrl;
+    env.obsidianRepoRef = process.env.CURSOR_OBSIDIAN_REPO_REF?.trim() || "main";
   }
 
   if (openaiApiKey) env.openaiApiKey = openaiApiKey;

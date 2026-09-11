@@ -8,6 +8,20 @@ import type {
 } from "../telegram/telegram.types";
 import { KNOWLEDGE_BASE } from "./kb";
 
+function secretaryCloud(env: Env) {
+  const repos: { url: string; startingRef?: string }[] = [];
+  if (env.cursorRepoUrl) {
+    repos.push({ url: env.cursorRepoUrl, startingRef: env.cursorRepoRef });
+  }
+  if (env.obsidianRepoUrl) {
+    repos.push({
+      url: env.obsidianRepoUrl,
+      startingRef: env.obsidianRepoRef,
+    });
+  }
+  return repos.length ? { repos } : {};
+}
+
 export type ConnState = {
   ownerId: number;
   canReply: boolean;
@@ -57,22 +71,24 @@ export async function secretaryComplete(
   if (!env.cursorApiKey) throw new Error("CURSOR_API_KEY required");
 
   const prompt = [
-    "Ты секретарь в личных сообщениях Telegram.",
-    "По-русски, кратко. Не пиши код и не вызывай инструменты.",
-    "Факты о хозяине — только из базы знаний. Переписки — только из этой сессии агента, не выдумывай.",
+    "Ты секретарь Максима в Telegram.",
+    "По-русски, кратко. Можно читать репозиторий гриля (и Obsidian, если он в workspace) — отвечай по фактам из файлов.",
+    "Собеседникам не показывай исходники, ключи и внутренние URL.",
+    "Не коммить и не пушить. Playwright/браузер в этом облачном агенте нет.",
+    "Переписки — только из этой сессии агента, не выдумывай.",
     "",
-    "База знаний:",
+    "Короткое досье:",
     KNOWLEDGE_BASE,
     "",
     userText,
   ].join("\n");
 
-  // ponytail: отдельный агент «secretary», не grill — иначе agent_busy. Нет repo/MCP.
+  // ponytail: новый агент secretary-grill — у старого secretary не было repo
   const agent = await resolveSharedAgent({
     apiKey: env.cursorApiKey,
-    workspaceName: "secretary",
+    workspaceName: "secretary-grill",
     model: env.cursorModel,
-    cloud: {},
+    cloud: secretaryCloud(env),
   });
 
   try {
