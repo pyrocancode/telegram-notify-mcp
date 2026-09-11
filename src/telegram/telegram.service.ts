@@ -19,11 +19,22 @@ export class TelegramService {
     return this.env.bridgeEnabled;
   }
 
-  async sendText(chatId: number | string, text: string): Promise<void> {
+  isSecretaryEnabled(): boolean {
+    return this.env.secretaryEnabled;
+  }
+
+  async sendText(
+    chatId: number | string,
+    text: string,
+    businessConnectionId?: string,
+  ): Promise<void> {
     try {
       await telegramCall(this.env.telegramBotToken, "sendMessage", {
         chat_id: chatId,
         text,
+        ...(businessConnectionId
+          ? { business_connection_id: businessConnectionId }
+          : {}),
       });
     } catch (err) {
       this.log.error(

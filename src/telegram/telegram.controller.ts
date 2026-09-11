@@ -11,6 +11,7 @@ import {
 import { waitUntil } from "@vercel/functions";
 import { CursorService } from "../cursor/cursor.service";
 import { loadEnv } from "../env";
+import { handleBusinessMessage } from "../secretary/secretary";
 import { parseInboundMessage } from "./telegram-inbound";
 import { TelegramService } from "./telegram.service";
 import type { TelegramUpdate } from "./telegram.types";
@@ -30,18 +31,35 @@ export class TelegramController {
     @Body() update: TelegramUpdate,
     @Headers("x-telegram-bot-api-secret-token") secret?: string,
   ) {
-    if (!this.telegram.isBridgeEnabled()) {
-      throw new ServiceUnavailableException("Cursor bridge not configured");
-    }
-
     if (!this.telegram.verifyWebhookSecret(secret)) {
       throw new UnauthorizedException();
+    }
+
+    if (
+      !this.telegram.isBridgeEnabled() &&
+      !this.telegram.isSecretaryEnabled()
+    ) {
+      throw new ServiceUnavailableException("Telegram webhook not configured");
+    }
+
+    if (update.business_message) {
+      if (this.telegram.isSecretaryEnabled()) {
+        const env = loadEnv();
+        waitUntil(
+          handleBusinessMessage(env, update.business_message, (id, text, biz) =>
+            this.telegram.sendText(id, text, biz),
+          ).catch((err) => {
+            this.log.error("secretary failed", err);
+          }),
+        );
+      }
+      return { ok: true };
     }
 
     const message = update.message;
     const chatId = message?.chat.id;
 
-    if (!message || chatId == null) {
+    if (!this.telegram.isBridgeEnabled() || !message || chatId == null) {
       return { ok: true };
     }
 

@@ -13,8 +13,10 @@ export type Env = {
   cursorAgentId?: string;
   cursorRepoUrl?: string;
   cursorRepoRef?: string;
-  /** Whisper transcription for inbound voice messages */
+  /** Whisper + secretary LLM */
   openaiApiKey?: string;
+  openaiModel: string;
+  secretaryEnabled: boolean;
 };
 
 function required(name: string): string {
@@ -36,7 +38,9 @@ export function loadEnv(): Env {
   const cursorApiKey = process.env.CURSOR_API_KEY?.trim();
   const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
   const allowedRaw = process.env.ALLOWED_CHAT_IDS?.trim();
+  const openaiApiKey = process.env.OPENAI_API_KEY?.trim();
   const bridgeEnabled = Boolean(cursorApiKey && webhookSecret && allowedRaw);
+  const secretaryEnabled = Boolean(openaiApiKey && webhookSecret);
 
   const env: Env = {
     telegramBotToken: required("TELEGRAM_BOT_TOKEN"),
@@ -48,14 +52,16 @@ export function loadEnv(): Env {
         ? `https://${process.env.VERCEL_URL}`
         : "http://localhost:3000"),
     bridgeEnabled,
+    secretaryEnabled,
+    telegramWebhookSecret: webhookSecret,
     cursorModel: process.env.CURSOR_MODEL?.trim() || "composer-2.5",
     cursorWorkspaceName:
       process.env.CURSOR_WORKSPACE_NAME?.trim() || "grill",
     allowedChatIds: new Set<string>(),
+    openaiModel: process.env.OPENAI_MODEL?.trim() || "gpt-4o-mini",
   };
 
   if (bridgeEnabled) {
-    env.telegramWebhookSecret = webhookSecret;
     env.allowedChatIds = parseAllowedChatIds(allowedRaw!);
     env.cursorApiKey = cursorApiKey;
     const agentId = process.env.CURSOR_AGENT_ID?.trim();
@@ -68,7 +74,6 @@ export function loadEnv(): Env {
     env.cursorRepoRef = process.env.CURSOR_REPO_REF?.trim() || "main";
   }
 
-  const openaiApiKey = process.env.OPENAI_API_KEY?.trim();
   if (openaiApiKey) env.openaiApiKey = openaiApiKey;
 
   return env;
@@ -85,7 +90,11 @@ if (require.main === module) {
     if (!env.mcpSecret && !env.telegramChatId) {
       throw new Error("Need MCP_SECRET or TELEGRAM_CHAT_ID");
     }
-    console.log("env ok", { bridge: env.bridgeEnabled, mcp: mcpUrl(env) });
+    console.log("env ok", {
+      bridge: env.bridgeEnabled,
+      secretary: env.secretaryEnabled,
+      mcp: mcpUrl(env),
+    });
   } catch (e) {
     console.error(e instanceof Error ? e.message : e);
     process.exit(1);

@@ -1,3 +1,7 @@
+export type TelegramUser = {
+  id: number;
+};
+
 export type TelegramChat = {
   id: number;
   type: string;
@@ -30,14 +34,26 @@ export type TelegramVoice = {
 export type TelegramMessage = {
   message_id: number;
   chat: TelegramChat;
+  from?: TelegramUser;
   text?: string;
   caption?: string;
   photo?: TelegramPhotoSize[];
   document?: TelegramDocument;
   voice?: TelegramVoice;
+  business_connection_id?: string;
+};
+
+export type TelegramBusinessConnection = {
+  id: string;
+  user: TelegramUser;
+  is_enabled: boolean;
+  rights?: { can_reply?: boolean };
+  can_reply?: boolean;
 };
 
 export type TelegramUpdate = {
   update_id: number;
   message?: TelegramMessage;
+  business_message?: TelegramMessage;
+  business_connection?: TelegramBusinessConnection;
 };
