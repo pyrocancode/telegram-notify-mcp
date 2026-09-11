@@ -8,18 +8,21 @@ import type {
 } from "../telegram/telegram.types";
 import { KNOWLEDGE_BASE } from "./kb";
 
-function secretaryCloud(env: Env) {
-  const repos: { url: string; startingRef?: string }[] = [];
-  if (env.cursorRepoUrl) {
-    repos.push({ url: env.cursorRepoUrl, startingRef: env.cursorRepoRef });
+const KB_CAP = 60_000;
+
+export async function loadSecretaryKnowledge(env: Env): Promise<string> {
+  const parts = [KNOWLEDGE_BASE];
+  for (const url of env.secretaryKbUrls) {
+    try {
+      const res = await fetch(url, { redirect: "follow" });
+      if (!res.ok) continue;
+      const text = (await res.text()).trim();
+      if (text) parts.push(`# Источник ${url}\n${text}`);
+    } catch {
+      // ponytail: битый URL не валит ответ
+    }
   }
-  if (env.obsidianRepoUrl) {
-    repos.push({
-      url: env.obsidianRepoUrl,
-      startingRef: env.obsidianRepoRef,
-    });
-  }
-  return repos.length ? { repos } : {};
+  return parts.join("\n\n").slice(0, KB_CAP);
 }
 
 export type ConnState = {
@@ -70,25 +73,23 @@ export async function secretaryComplete(
 ): Promise<string> {
   if (!env.cursorApiKey) throw new Error("CURSOR_API_KEY required");
 
+  const knowledge = await loadSecretaryKnowledge(env);
   const prompt = [
     "Ты секретарь Максима в Telegram.",
-    "По-русски, кратко. Можно читать репозиторий гриля (и Obsidian, если он в workspace) — отвечай по фактам из файлов.",
-    "Собеседникам не показывай исходники, ключи и внутренние URL.",
-    "Не коммить и не пушить. Playwright/браузер в этом облачном агенте нет.",
-    "Переписки — только из этой сессии агента, не выдумывай.",
+    "По-русски, кратко. Отвечай только по базе знаний ниже и по входящим ЛС этой сессии.",
+    "Не выдумывай цены и факты. Собеседникам не показывай ключи и внутренние URL.",
     "",
-    "Короткое досье:",
-    KNOWLEDGE_BASE,
+    "База знаний:",
+    knowledge,
     "",
     userText,
   ].join("\n");
 
-  // ponytail: новый агент secretary-grill — у старого secretary не было repo
   const agent = await resolveSharedAgent({
     apiKey: env.cursorApiKey,
-    workspaceName: "secretary-grill",
+    workspaceName: "secretary",
     model: env.cursorModel,
-    cloud: secretaryCloud(env),
+    cloud: {},
   });
 
   try {

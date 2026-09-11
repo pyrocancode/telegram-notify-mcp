@@ -13,8 +13,8 @@ export type Env = {
   cursorAgentId?: string;
   cursorRepoUrl?: string;
   cursorRepoRef?: string;
-  obsidianRepoUrl?: string;
-  obsidianRepoRef?: string;
+  /** HTTPS markdown URLs, comma-separated — stuffed into secretary prompt */
+  secretaryKbUrls: string[];
   /** Whisper only */
   openaiApiKey?: string;
   secretaryEnabled: boolean;
@@ -59,6 +59,10 @@ export function loadEnv(): Env {
     cursorWorkspaceName:
       process.env.CURSOR_WORKSPACE_NAME?.trim() || "grill",
     allowedChatIds: new Set<string>(),
+    secretaryKbUrls: (process.env.SECRETARY_KB_URLS ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => /^https:\/\//i.test(s)),
   };
 
   if (cursorApiKey) env.cursorApiKey = cursorApiKey;
@@ -73,12 +77,6 @@ export function loadEnv(): Env {
   if (repoUrl) {
     env.cursorRepoUrl = repoUrl;
     env.cursorRepoRef = process.env.CURSOR_REPO_REF?.trim() || "main";
-  }
-
-  const obsidianUrl = process.env.CURSOR_OBSIDIAN_REPO_URL?.trim();
-  if (obsidianUrl) {
-    env.obsidianRepoUrl = obsidianUrl;
-    env.obsidianRepoRef = process.env.CURSOR_OBSIDIAN_REPO_REF?.trim() || "main";
   }
 
   if (openaiApiKey) env.openaiApiKey = openaiApiKey;
