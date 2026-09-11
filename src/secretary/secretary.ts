@@ -58,14 +58,12 @@ export async function secretaryComplete(
 
   const prompt = [
     "Ты секретарь в личных сообщениях Telegram.",
-    "Пишешь от лица хозяина аккаунта, коротко, по-русски.",
-    "Факты только из базы знаний. Не обещай того, чего там нет.",
-    "Не пиши код и не вызывай инструменты — только текст ответа собеседнику.",
+    "По-русски, кратко. Не пиши код и не вызывай инструменты.",
+    "Факты о хозяине — только из базы знаний. Переписки — только из этой сессии агента, не выдумывай.",
     "",
     "База знаний:",
     KNOWLEDGE_BASE,
     "",
-    "Сообщение:",
     userText,
   ].join("\n");
 
@@ -87,6 +85,54 @@ export async function secretaryComplete(
   } finally {
     agent.close();
   }
+}
+
+export function senderLabel(from?: TelegramMessage["from"]): string {
+  if (!from) return "неизвестный";
+  const name = [from.first_name, from.last_name].filter(Boolean).join(" ");
+  const nick = from.username ? `@${from.username}` : "";
+  return `${name || nick || "id"} ${nick} id=${from.id}`.trim();
+}
+
+export function isOwnerChatQuery(text: string): boolean {
+  const t = text.trim();
+  if (/^\/(?:inbox|secretar(?:y|iat)?|секрет\w*)(?:@\w+)?(?:\s|$)/i.test(t)) {
+    return true;
+  }
+  return /(что|кто|как(ие)?).{0,60}(писал|написа|личк|входящ|в чат)|сводк[ауие]|\binbox\b/i.test(
+    t,
+  );
+}
+
+export function ownerInboxPrompt(text: string): string {
+  const q =
+    text
+      .replace(/^\/(?:inbox|secretar(?:y|iat)?|секрет\w*)(?:@\w+)?\s*/i, "")
+      .trim() ||
+    "Кратко перескажи, кто что писал во входящих ЛС. Если в этой сессии ничего не было — так и скажи.";
+  return [
+    "Вопрос ХОЗЯИНА в чате с ботом. Ответь хозяину, не пиши чужим людям.",
+    q,
+  ].join("\n");
+}
+
+export function inboundPrompt(message: TelegramMessage, text: string): string {
+  return [
+    "Входящее ЛС. Запомни отправителя и текст. Ответь этому человеку от лица хозяина — только текст ответа.",
+    `От: ${senderLabel(message.from)}`,
+    `chat_id=${message.chat.id}`,
+    "",
+    text,
+  ].join("\n");
+}
+
+export async function handleOwnerInbox(
+  env: Env,
+  text: string,
+  send: (text: string) => Promise<void>,
+): Promise<void> {
+  const reply = await secretaryComplete(env, ownerInboxPrompt(text));
+  await send(reply);
 }
 
 export async function handleBusinessMessage(
@@ -122,7 +168,10 @@ export async function handleBusinessMessage(
     // ponytail: typing is optional
   }
 
-  const reply = await secretaryComplete(env, inbound.payload.text);
+  const reply = await secretaryComplete(
+    env,
+    inboundPrompt(message, inbound.payload.text),
+  );
   await send(chatId, reply, bizId);
 }
 
@@ -142,5 +191,8 @@ if (require.main === module) {
     "skip no reply",
   );
   console.assert(KNOWLEDGE_BASE.includes("Максим"), "kb loaded");
+  console.assert(isOwnerChatQuery("/inbox") === true, "inbox cmd");
+  console.assert(isOwnerChatQuery("что мне писали?") === true, "nl inbox");
+  console.assert(isOwnerChatQuery("почини баг в api") === false, "code stays grill");
   console.log("secretary ok");
 }

@@ -11,7 +11,11 @@ import {
 import { waitUntil } from "@vercel/functions";
 import { CursorService } from "../cursor/cursor.service";
 import { loadEnv } from "../env";
-import { handleBusinessMessage } from "../secretary/secretary";
+import {
+  handleBusinessMessage,
+  handleOwnerInbox,
+  isOwnerChatQuery,
+} from "../secretary/secretary";
 import { parseInboundMessage } from "./telegram-inbound";
 import { TelegramService } from "./telegram.service";
 import type { TelegramUpdate } from "./telegram.types";
@@ -72,12 +76,27 @@ export class TelegramController {
     if (textOnly === "/start" || (textOnly && /^прив(ет)?$/i.test(textOnly))) {
       await this.telegram.sendText(
         chatId,
-        "Привет. Напиши задачу, пришли фото/файл или голосовое — запущу cloud-агента Cursor.",
+        "Привет. Задача в код — напиши её сюда. Про входящие ЛС: /inbox или спроси, что писали.",
       );
       return { ok: true };
     }
 
     const env = loadEnv();
+    if (this.telegram.isSecretaryEnabled() && textOnly && isOwnerChatQuery(textOnly)) {
+      waitUntil(
+        handleOwnerInbox(env, textOnly, (text) =>
+          this.telegram.sendText(chatId, text),
+        ).catch((err) => {
+          this.log.error("owner inbox failed", err);
+          return this.telegram.sendText(
+            chatId,
+            "Не смог посмотреть входящие. Если секретарь ещё отвечает кому-то — напиши через минуту.",
+          );
+        }),
+      );
+      return { ok: true };
+    }
+
     let inbound;
     try {
       inbound = await parseInboundMessage(
