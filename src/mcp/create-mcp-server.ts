@@ -1,5 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { loadEnv } from "../env";
+import { kbRead, kbSearch } from "../secretary/kb-github";
 import {
   resolveChatId,
   telegramCall,
@@ -317,6 +319,30 @@ export function createMcpServer(telegram: TelegramConfig): McpServer {
       return {
         content: [{ type: "text" as const, text: `Chat action '${action}' sent` }],
       };
+    },
+  );
+
+  // ponytail: MCP+zod TS2589
+  // @ts-expect-error TS2589 type instantiation depth
+  server.tool(
+    "kb_search",
+    "Search second-brain markdown notes (private GitHub vault). Returns matching paths/snippets. Call before answering facts about grill/business.",
+    { query: z.string().min(1).max(200).describe("Search query") },
+    async ({ query }) => {
+      const text = await kbSearch(loadEnv(), query);
+      return { content: [{ type: "text" as const, text }] };
+    },
+  );
+
+  // ponytail: MCP+zod TS2589
+  // @ts-expect-error TS2589 type instantiation depth
+  server.tool(
+    "kb_read",
+    "Read one markdown note from the second-brain vault by path returned from kb_search.",
+    { path: z.string().min(1).max(256).describe("Path like grill/menu.md") },
+    async ({ path }) => {
+      const text = await kbRead(loadEnv(), path);
+      return { content: [{ type: "text" as const, text }] };
     },
   );
 

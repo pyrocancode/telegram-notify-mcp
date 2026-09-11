@@ -1,5 +1,6 @@
 import { resolveSharedAgent } from "../cursor/resolve-shared-agent";
 import type { Env } from "../env";
+import { mcpUrl } from "../env";
 import { telegramCall } from "../telegram/telegram-api";
 import { parseInboundMessage } from "../telegram/telegram-inbound";
 import type {
@@ -7,80 +8,6 @@ import type {
   TelegramMessage,
 } from "../telegram/telegram.types";
 import { KNOWLEDGE_BASE } from "./kb";
-
-const KB_CAP = 60_000;
-const MAX_MD = 40;
-
-type GhTree = {
-  tree?: { path?: string; type?: string }[];
-};
-
-async function ghHeaders(token?: string): Promise<HeadersInit> {
-  const h: Record<string, string> = {
-    Accept: "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2022-11-28",
-    "User-Agent": "telegram-notify-mcp",
-  };
-  if (token) h.Authorization = `Bearer ${token}`;
-  return h;
-}
-
-export async function loadGithubMarkdown(env: Env): Promise<string[]> {
-  if (!env.secretaryKbGithub || !env.githubToken) return [];
-  const repo = env.secretaryKbGithub;
-  const ref = env.secretaryKbGithubRef;
-  const prefix = env.secretaryKbGithubPath;
-  const headers = await ghHeaders(env.githubToken);
-
-  const treeRes = await fetch(
-    `https://api.github.com/repos/${repo}/git/trees/${encodeURIComponent(ref)}?recursive=1`,
-    { headers },
-  );
-  if (!treeRes.ok) return [];
-  const tree = (await treeRes.json()) as GhTree;
-  const files = (tree.tree ?? [])
-    .filter((n) => n.type === "blob" && n.path?.endsWith(".md"))
-    .map((n) => n.path!)
-    .filter((p) => !prefix || p === prefix || p.startsWith(`${prefix}/`))
-    .slice(0, MAX_MD);
-
-  const parts: string[] = [];
-  for (const path of files) {
-    const res = await fetch(
-      `https://api.github.com/repos/${repo}/contents/${path}?ref=${encodeURIComponent(ref)}`,
-      {
-        headers: {
-          ...headers,
-          Accept: "application/vnd.github.raw",
-        },
-      },
-    );
-    if (!res.ok) continue;
-    const text = (await res.text()).trim();
-    if (text) parts.push(`# ${path}\n${text}`);
-  }
-  return parts;
-}
-
-export async function loadSecretaryKnowledge(env: Env): Promise<string> {
-  const parts = [KNOWLEDGE_BASE];
-  for (const url of env.secretaryKbUrls) {
-    try {
-      const res = await fetch(url, { redirect: "follow" });
-      if (!res.ok) continue;
-      const text = (await res.text()).trim();
-      if (text) parts.push(`# Источник ${url}\n${text}`);
-    } catch {
-      // ponytail: битый URL не валит ответ
-    }
-  }
-  try {
-    parts.push(...(await loadGithubMarkdown(env)));
-  } catch {
-    // ponytail: GitHub down — отвечаем по kb.ts
-  }
-  return parts.join("\n\n").slice(0, KB_CAP);
-}
 
 export type ConnState = {
   ownerId: number;
@@ -130,27 +57,40 @@ export async function secretaryComplete(
 ): Promise<string> {
   if (!env.cursorApiKey) throw new Error("CURSOR_API_KEY required");
 
-  const knowledge = await loadSecretaryKnowledge(env);
   const prompt = [
-    "Ты секретарь Максима в Telegram.",
-    "По-русски, кратко. Отвечай только по базе знаний ниже и по входящим ЛС этой сессии.",
-    "Не выдумывай цены и факты. Собеседникам не показывай ключи и внутренние URL.",
+    "Ты второй мозг Максима в Telegram: сначала ищешь в заметках, потом отвечаешь.",
+    "MCP: kb_search(запрос) → kb_read(путь.md). Не тащи всю базу. Нет в заметках — так и скажи.",
+    "По-русски, кратко. Не выдумывай цены. Собеседникам не показывай ключи и внутренние URL.",
     "",
-    "База знаний:",
-    knowledge,
+    KNOWLEDGE_BASE,
     "",
     userText,
   ].join("\n");
+
+  const mcpHeaders: Record<string, string> = {
+    "X-Telegram-Bot-Token": env.telegramBotToken,
+    "X-Telegram-Chat-Id": env.telegramChatId,
+  };
+  if (env.mcpSecret) mcpHeaders.Authorization = `Bearer ${env.mcpSecret}`;
+
+  const mcpServers = {
+    telegram: {
+      type: "http" as const,
+      url: mcpUrl(env),
+      headers: mcpHeaders,
+    },
+  };
 
   const agent = await resolveSharedAgent({
     apiKey: env.cursorApiKey,
     workspaceName: "secretary",
     model: env.cursorModel,
     cloud: {},
+    mcpServers,
   });
 
   try {
-    const run = await agent.send({ text: prompt });
+    const run = await agent.send({ text: prompt }, { mcpServers });
     const result = await run.wait();
     if (result.status === "error") throw new Error("secretary run error");
     const text = result.result?.trim();
