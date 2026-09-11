@@ -9,6 +9,58 @@ import type {
 import { KNOWLEDGE_BASE } from "./kb";
 
 const KB_CAP = 60_000;
+const MAX_MD = 40;
+
+type GhTree = {
+  tree?: { path?: string; type?: string }[];
+};
+
+async function ghHeaders(token?: string): Promise<HeadersInit> {
+  const h: Record<string, string> = {
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "User-Agent": "telegram-notify-mcp",
+  };
+  if (token) h.Authorization = `Bearer ${token}`;
+  return h;
+}
+
+export async function loadGithubMarkdown(env: Env): Promise<string[]> {
+  if (!env.secretaryKbGithub || !env.githubToken) return [];
+  const repo = env.secretaryKbGithub;
+  const ref = env.secretaryKbGithubRef;
+  const prefix = env.secretaryKbGithubPath;
+  const headers = await ghHeaders(env.githubToken);
+
+  const treeRes = await fetch(
+    `https://api.github.com/repos/${repo}/git/trees/${encodeURIComponent(ref)}?recursive=1`,
+    { headers },
+  );
+  if (!treeRes.ok) return [];
+  const tree = (await treeRes.json()) as GhTree;
+  const files = (tree.tree ?? [])
+    .filter((n) => n.type === "blob" && n.path?.endsWith(".md"))
+    .map((n) => n.path!)
+    .filter((p) => !prefix || p === prefix || p.startsWith(`${prefix}/`))
+    .slice(0, MAX_MD);
+
+  const parts: string[] = [];
+  for (const path of files) {
+    const res = await fetch(
+      `https://api.github.com/repos/${repo}/contents/${path}?ref=${encodeURIComponent(ref)}`,
+      {
+        headers: {
+          ...headers,
+          Accept: "application/vnd.github.raw",
+        },
+      },
+    );
+    if (!res.ok) continue;
+    const text = (await res.text()).trim();
+    if (text) parts.push(`# ${path}\n${text}`);
+  }
+  return parts;
+}
 
 export async function loadSecretaryKnowledge(env: Env): Promise<string> {
   const parts = [KNOWLEDGE_BASE];
@@ -21,6 +73,11 @@ export async function loadSecretaryKnowledge(env: Env): Promise<string> {
     } catch {
       // ponytail: битый URL не валит ответ
     }
+  }
+  try {
+    parts.push(...(await loadGithubMarkdown(env)));
+  } catch {
+    // ponytail: GitHub down — отвечаем по kb.ts
   }
   return parts.join("\n\n").slice(0, KB_CAP);
 }

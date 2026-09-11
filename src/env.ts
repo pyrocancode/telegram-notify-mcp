@@ -15,6 +15,10 @@ export type Env = {
   cursorRepoRef?: string;
   /** HTTPS markdown URLs, comma-separated — stuffed into secretary prompt */
   secretaryKbUrls: string[];
+  secretaryKbGithub?: string;
+  secretaryKbGithubPath: string;
+  secretaryKbGithubRef: string;
+  githubToken?: string;
   /** Whisper only */
   openaiApiKey?: string;
   secretaryEnabled: boolean;
@@ -63,7 +67,17 @@ export function loadEnv(): Env {
       .split(",")
       .map((s) => s.trim())
       .filter((s) => /^https:\/\//i.test(s)),
+    secretaryKbGithubPath: (
+      process.env.SECRETARY_KB_GITHUB_PATH ?? ""
+    ).replace(/^\/+|\/+$/g, ""),
+    secretaryKbGithubRef:
+      process.env.SECRETARY_KB_GITHUB_REF?.trim() || "main",
   };
+
+  const gh = process.env.SECRETARY_KB_GITHUB?.trim();
+  if (gh && /^[\w.-]+\/[\w.-]+$/.test(gh)) env.secretaryKbGithub = gh;
+  const ghToken = process.env.GITHUB_TOKEN?.trim();
+  if (ghToken) env.githubToken = ghToken;
 
   if (cursorApiKey) env.cursorApiKey = cursorApiKey;
 
