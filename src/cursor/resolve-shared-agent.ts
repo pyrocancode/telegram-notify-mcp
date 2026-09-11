@@ -6,7 +6,7 @@ type SharedAgentInput = {
   agentId?: string;
   model: string;
   cloud: AgentOptions["cloud"];
-  mcpServers: AgentOptions["mcpServers"];
+  mcpServers?: AgentOptions["mcpServers"];
 };
 
 /** ponytail: first name match wins; duplicate titles need manual CURSOR_AGENT_ID */

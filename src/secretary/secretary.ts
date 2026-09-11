@@ -1,3 +1,4 @@
+import { resolveSharedAgent } from "../cursor/resolve-shared-agent";
 import type { Env } from "../env";
 import { telegramCall } from "../telegram/telegram-api";
 import { parseInboundMessage } from "../telegram/telegram-inbound";
@@ -53,42 +54,39 @@ export async function secretaryComplete(
   env: Env,
   userText: string,
 ): Promise<string> {
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.openaiApiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: env.openaiModel,
-      temperature: 0.3,
-      max_tokens: 400,
-      messages: [
-        {
-          role: "system",
-          content: [
-            "Ты секретарь в личных сообщениях Telegram.",
-            "Пишешь от лица хозяина аккаунта, коротко, по-русски.",
-            "Факты только из базы знаний. Не обещай того, чего там нет.",
-            "",
-            "База знаний:",
-            KNOWLEDGE_BASE,
-          ].join("\n"),
-        },
-        { role: "user", content: userText },
-      ],
-    }),
+  if (!env.cursorApiKey) throw new Error("CURSOR_API_KEY required");
+
+  const prompt = [
+    "Ты секретарь в личных сообщениях Telegram.",
+    "Пишешь от лица хозяина аккаунта, коротко, по-русски.",
+    "Факты только из базы знаний. Не обещай того, чего там нет.",
+    "Не пиши код и не вызывай инструменты — только текст ответа собеседнику.",
+    "",
+    "База знаний:",
+    KNOWLEDGE_BASE,
+    "",
+    "Сообщение:",
+    userText,
+  ].join("\n");
+
+  // ponytail: отдельный агент «secretary», не grill — иначе agent_busy. Нет repo/MCP.
+  const agent = await resolveSharedAgent({
+    apiKey: env.cursorApiKey,
+    workspaceName: "secretary",
+    model: env.cursorModel,
+    cloud: {},
   });
-  const data = (await res.json()) as {
-    choices?: { message?: { content?: string } }[];
-    error?: { message?: string };
-  };
-  if (!res.ok) {
-    throw new Error(data.error?.message ?? `OpenAI HTTP ${res.status}`);
+
+  try {
+    const run = await agent.send({ text: prompt });
+    const result = await run.wait();
+    if (result.status === "error") throw new Error("secretary run error");
+    const text = result.result?.trim();
+    if (!text) throw new Error("Empty secretary reply");
+    return text.slice(0, 4096);
+  } finally {
+    agent.close();
   }
-  const text = data.choices?.[0]?.message?.content?.trim();
-  if (!text) throw new Error("Empty secretary reply");
-  return text.slice(0, 4096);
 }
 
 export async function handleBusinessMessage(
@@ -102,7 +100,7 @@ export async function handleBusinessMessage(
 ): Promise<void> {
   const bizId = message.business_connection_id;
   const chatId = message.chat?.id;
-  if (!bizId || chatId == null || !env.openaiApiKey) return;
+  if (!bizId || chatId == null || !env.cursorApiKey) return;
 
   const conn = await loadConn(env.telegramBotToken, bizId);
   if (!shouldSecretaryReply(message, conn)) return;

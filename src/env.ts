@@ -13,9 +13,8 @@ export type Env = {
   cursorAgentId?: string;
   cursorRepoUrl?: string;
   cursorRepoRef?: string;
-  /** Whisper + secretary LLM */
+  /** Whisper only */
   openaiApiKey?: string;
-  openaiModel: string;
   secretaryEnabled: boolean;
 };
 
@@ -40,7 +39,7 @@ export function loadEnv(): Env {
   const allowedRaw = process.env.ALLOWED_CHAT_IDS?.trim();
   const openaiApiKey = process.env.OPENAI_API_KEY?.trim();
   const bridgeEnabled = Boolean(cursorApiKey && webhookSecret && allowedRaw);
-  const secretaryEnabled = Boolean(openaiApiKey && webhookSecret);
+  const secretaryEnabled = Boolean(cursorApiKey && webhookSecret);
 
   const env: Env = {
     telegramBotToken: required("TELEGRAM_BOT_TOKEN"),
@@ -58,12 +57,12 @@ export function loadEnv(): Env {
     cursorWorkspaceName:
       process.env.CURSOR_WORKSPACE_NAME?.trim() || "grill",
     allowedChatIds: new Set<string>(),
-    openaiModel: process.env.OPENAI_MODEL?.trim() || "gpt-4o-mini",
   };
+
+  if (cursorApiKey) env.cursorApiKey = cursorApiKey;
 
   if (bridgeEnabled) {
     env.allowedChatIds = parseAllowedChatIds(allowedRaw!);
-    env.cursorApiKey = cursorApiKey;
     const agentId = process.env.CURSOR_AGENT_ID?.trim();
     if (agentId) env.cursorAgentId = agentId;
   }
