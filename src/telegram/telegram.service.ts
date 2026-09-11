@@ -23,6 +23,20 @@ export class TelegramService {
     return this.env.secretaryEnabled;
   }
 
+  async installWebhook(): Promise<{ ok: boolean; url: string }> {
+    const url = `${this.env.publicUrl.replace(/\/$/, "")}/telegram/webhook`;
+    await telegramCall(this.env.telegramBotToken, "setWebhook", {
+      url,
+      secret_token: this.env.telegramWebhookSecret,
+      allowed_updates: [
+        "message",
+        "business_message",
+        "business_connection",
+      ],
+    });
+    return { ok: true, url };
+  }
+
   async sendText(
     chatId: number | string,
     text: string,

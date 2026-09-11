@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   Headers,
   HttpCode,
   Logger,
@@ -28,6 +29,11 @@ export class TelegramController {
     private readonly telegram: TelegramService,
     private readonly cursor: CursorService,
   ) {}
+
+  @Get("setup-webhook")
+  async setupWebhook() {
+    return this.telegram.installWebhook();
+  }
 
   @Post("webhook")
   @HttpCode(200)

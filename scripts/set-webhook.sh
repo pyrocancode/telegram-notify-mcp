@@ -2,16 +2,36 @@
 # allowed_updates must include business_message, иначе секретарь не получит ЛС
 set -euo pipefail
 cd "$(dirname "$0")/.."
-[[ -f .env ]] || { echo "missing .env"; exit 1; }
-val() { grep -E "^$1=" .env | head -1 | cut -d= -f2-; }
-TOKEN=$(val TELEGRAM_BOT_TOKEN)
-SECRET=$(val TELEGRAM_WEBHOOK_SECRET)
-URL=$(val PUBLIC_URL)
-URL=${URL%/}
-[[ -n "$TOKEN" && -n "$SECRET" && -n "$URL" ]] || {
-  echo "need TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET, PUBLIC_URL"
-  exit 1
+
+val() {
+  local name="$1"
+  local v="${!name:-}"
+  if [[ -n "$v" && "$v" != "[SENSITIVE]" ]]; then
+    printf '%s' "$v"
+    return
+  fi
+  if [[ -f .env ]]; then
+    v=$(grep -E "^${name}=" .env | head -1 | cut -d= -f2- || true)
+    if [[ -n "$v" && "$v" != "[SENSITIVE]" ]]; then
+      printf '%s' "$v"
+      return
+    fi
+  fi
+  return 1
 }
+
+TOKEN=$(val TELEGRAM_BOT_TOKEN) || true
+SECRET=$(val TELEGRAM_WEBHOOK_SECRET) || true
+URL=$(val PUBLIC_URL) || true
+URL=${URL:-https://telegram-notify-mcp.vercel.app}
+URL=${URL%/}
+
+if [[ -z "${TOKEN:-}" || -z "${SECRET:-}" ]]; then
+  echo "Нет токена. Запусти так:"
+  echo "  npx vercel env run --environment production -- bash scripts/set-webhook.sh"
+  exit 1
+fi
+
 curl -sS "https://api.telegram.org/bot${TOKEN}/setWebhook" \
   -d "url=${URL}/telegram/webhook" \
   -d "secret_token=${SECRET}" \
