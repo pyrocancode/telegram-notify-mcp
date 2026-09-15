@@ -3,6 +3,7 @@ import type { Env } from "../env";
 import { mcpUrl } from "../env";
 import { telegramCall } from "../telegram/telegram-api";
 import { parseInboundMessage } from "../telegram/telegram-inbound";
+import type { InboundImage } from "../telegram/telegram-inbound";
 import type {
   TelegramBusinessConnection,
   TelegramMessage,
@@ -54,12 +55,16 @@ export async function loadConn(
 export async function secretaryComplete(
   env: Env,
   userText: string,
+  images?: InboundImage[],
 ): Promise<string> {
   if (!env.cursorApiKey) throw new Error("CURSOR_API_KEY required");
 
   const prompt = [
     "Ты второй мозг Максима в Telegram: сначала ищешь в заметках, потом отвечаешь.",
-    "MCP: kb_search(запрос) → kb_read(путь.md). Не тащи всю базу. Нет в заметках — так и скажи.",
+    "MCP: kb_search(запрос) → kb_read(путь). Не тащи всю базу. Нет в заметках — так и скажи.",
+    images?.length
+      ? "К сообщению приложены изображения: внимательно распознай, что на них, и учитывай это в ответе."
+      : "",
     "По-русски, кратко. Не выдумывай цены. Собеседникам не показывай ключи и внутренние URL.",
     "",
     KNOWLEDGE_BASE,
@@ -90,7 +95,15 @@ export async function secretaryComplete(
   });
 
   try {
-    const run = await agent.send({ text: prompt }, { mcpServers });
+    const run = await agent.send(
+      {
+        text: prompt,
+        ...(images?.length
+          ? { images: images.map((image) => ({ data: image.data, mimeType: image.mimeType })) }
+          : {}),
+      },
+      { mcpServers },
+    );
     const result = await run.wait();
     if (result.status === "error") throw new Error("secretary run error");
     const text = result.result?.trim();
@@ -185,6 +198,7 @@ export async function handleBusinessMessage(
   const reply = await secretaryComplete(
     env,
     inboundPrompt(message, inbound.payload.text),
+    inbound.payload.images,
   );
   await send(chatId, reply, bizId);
 }

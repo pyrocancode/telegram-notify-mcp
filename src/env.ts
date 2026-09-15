@@ -19,6 +19,8 @@ export type Env = {
   secretaryKbGithubPath: string;
   secretaryKbGithubRef: string;
   githubToken?: string;
+  /** Public documentation URL, optionally including its access token. */
+  secretaryDocsUrl?: string;
   /** Whisper only */
   openaiApiKey?: string;
   secretaryEnabled: boolean;
@@ -78,6 +80,8 @@ export function loadEnv(): Env {
   if (gh && /^[\w.-]+\/[\w.-]+$/.test(gh)) env.secretaryKbGithub = gh;
   const ghToken = process.env.GITHUB_TOKEN?.trim();
   if (ghToken) env.githubToken = ghToken;
+  const docsUrl = process.env.SECRETARY_DOCS_URL?.trim();
+  if (docsUrl && /^https:\/\//i.test(docsUrl)) env.secretaryDocsUrl = docsUrl;
 
   if (cursorApiKey) env.cursorApiKey = cursorApiKey;
 

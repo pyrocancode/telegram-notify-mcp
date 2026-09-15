@@ -1,4 +1,5 @@
 import type { Env } from "../env";
+import { docsRead, docsSearch } from "./kb-docs";
 
 type GhTree = { tree?: { path?: string; type?: string }[] };
 type GhSearch = {
@@ -24,6 +25,8 @@ export async function kbSearch(
   env: Env,
   query: string,
 ): Promise<string> {
+  const docsResult = await docsSearch(env, query);
+  if (docsResult !== undefined) return docsResult;
   if (!env.secretaryKbGithub || !env.githubToken) {
     return "База не настроена: SECRETARY_KB_GITHUB и GITHUB_TOKEN.";
   }
@@ -70,6 +73,8 @@ export async function kbSearch(
 }
 
 export async function kbRead(env: Env, path: string): Promise<string> {
+  const docsResult = await docsRead(env, path);
+  if (docsResult !== undefined) return docsResult;
   if (!env.secretaryKbGithub || !env.githubToken) {
     return "База не настроена: SECRETARY_KB_GITHUB и GITHUB_TOKEN.";
   }

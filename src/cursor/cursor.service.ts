@@ -41,6 +41,7 @@ export class CursorService {
       "- или публичный HTTPS URL в photo_url / document_url",
       "Никогда не вставляй HTML <img>, markdown-картинки и локальные пути (/opt/..., /tmp/...) — они не доходят до чата.",
       "MCP telegram: send_chat_action (typing/upload_photo) при долгой работе.",
+      "Если приложена картинка — сначала внимательно распознай, что на ней, и опирайся на это в ответе.",
       "Пиши кратко, по-русски.",
     ]
       .filter(Boolean)

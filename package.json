@@ -8,7 +8,7 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
-    "self-check": "node dist/env.js && node dist/telegram/telegram-cascade.js && node dist/cursor/resolve-shared-agent.js && node dist/telegram/telegram-files.js && node dist/secretary/secretary.js && node dist/secretary/kb-github.js"
+    "self-check": "node dist/env.js && node dist/telegram/telegram-cascade.js && node dist/cursor/resolve-shared-agent.js && node dist/telegram/telegram-files.js && node dist/secretary/secretary.js && node dist/secretary/kb-github.js && node dist/secretary/kb-docs.js"
   },
   "dependencies": {
     "@cursor/sdk": "^1.0.21",
